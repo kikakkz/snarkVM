@@ -51,7 +51,8 @@ members = [
   "utilities",
   "utilities/derives", # excluded from [features], for internal use primarily
   "wasm", # excluded from [features], WASM contexts will typically import this crate directly
-  ".integration" # excluded from [features], for CI only
+  ".integration", # excluded from [features], for CI only
+  "apps"
 ]
 
 [lib]

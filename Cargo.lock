@@ -1463,6 +1463,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "posw-marlin"
+version = "0.7.5"
+dependencies = [
+ "curl",
+ "rand",
+ "snarkvm-algorithms",
+ "snarkvm-dpc",
+ "snarkvm-gadgets",
+ "snarkvm-parameters",
+ "snarkvm-utilities",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
