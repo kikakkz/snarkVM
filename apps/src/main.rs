@@ -20,6 +20,7 @@ use snarkvm_dpc::{testnet2::Testnet2, BlockTemplate, Network, PoSWScheme};
 
 use core::sync::atomic::AtomicBool;
 use rand::thread_rng;
+use std::time::Instant;
 
 fn main() {
     // Construct the block template.
@@ -29,19 +30,31 @@ fn main() {
         block.height(),
         block.timestamp(),
         // block.difficulty_target(),
-        512,
+        u64::MAX,
+        // 21780226485109184,
         block.cumulative_weight(),
         block.previous_ledger_root(),
         block.transactions().clone(),
         block.to_coinbase_transaction().unwrap().to_records().next().unwrap(),
     );
 
-    for n in 1..3 {
-        println!("mine the {} block: {}", n, block_template.difficulty_target());
+    let mut mined = 0;
+    let start = Instant::now();
+    loop {
+        println!("mine block: {}", block_template.difficulty_target());
         // Construct a block header.
-        let block_header = Testnet2::posw().mine(&block_template, &AtomicBool::new(false), &mut thread_rng()).unwrap();
-        println!("mined a block: {}", block_header);
-
-        assert!(Testnet2::posw().verify_from_block_header(&block_header));
+        match Testnet2::posw().mine(&block_template, &AtomicBool::new(false), &mut thread_rng()) {
+            Ok(block_header) => {
+                if Testnet2::posw().verify_from_block_header(&block_header) {
+                    mined += 1;
+                    println!("mined the {} block: {}", mined, block_header);
+                }
+            },
+            Err(_err) => {},
+        }
+        if mined >= 10 {
+            break
+        }
     }
+    println!("mined {} blocks taken {}ms", mined, start.elapsed().as_millis());
 }

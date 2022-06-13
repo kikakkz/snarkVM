@@ -1,0 +1,1 @@
+cargo build --bin posw-marlin --features="testnet2" --release

@@ -39,6 +39,8 @@ pub use data_structures::*;
 mod polynomial;
 pub use polynomial::*;
 
+use std::time::Instant;
+
 /// Polynomial commitment based on [\[KZG10\]][kzg], with degree enforcement and
 /// batching taken from [[MBKM19, “Sonic”]][sonic] (more precisely, their
 /// counterparts in [[Gabizon19, “AuroraLight”]][al] that avoid negative G1 powers).
@@ -245,6 +247,8 @@ impl<E: PairingEngine, S: FiatShamirRng<E::Fr, E::Fq>> SonicKZG10<E, S> {
             let hiding_bound = p.hiding_bound();
             let label = p.label().to_string();
 
+            println!("degree_bound {:?} hiding_bound {:?} label {}", degree_bound, hiding_bound, label);
+
             pool.add_job(move || {
                 let mut rng = seed.map(rand::rngs::StdRng::from_seed);
                 add_to_trace!(|| "PC::Commit", || format!(
@@ -254,6 +258,8 @@ impl<E: PairingEngine, S: FiatShamirRng<E::Fr, E::Fq>> SonicKZG10<E, S> {
                     degree_bound,
                     hiding_bound,
                 ));
+
+                let start = Instant::now();
 
                 #[allow(clippy::or_fun_call)]
                 let (comm, rand) = p
@@ -268,13 +274,18 @@ impl<E: PairingEngine, S: FiatShamirRng<E::Fr, E::Fq>> SonicKZG10<E, S> {
                                     .ok_or(PCError::UnsupportedLagrangeBasisSize(domain.size()))?;
                                 assert!(domain.size().is_power_of_two());
                                 assert!(lagrange_basis.size().is_power_of_two());
-                                kzg10::KZG10::commit_lagrange(
+                                let start = Instant::now();
+                                println!("commit lagrange start at {:?} {:?}", start, domain);
+                                let result = kzg10::KZG10::commit_lagrange(
                                     &lagrange_basis,
                                     &evaluations.evaluations,
                                     hiding_bound,
                                     terminator,
                                     rng_ref,
-                                )
+                                );
+                                println!("commit lagrange taken {:?} {:?}", start.elapsed(), start);
+
+                                result
                             }
                             PolynomialWithBasis::Monomial { polynomial, degree_bound } => {
                                 let powers = if let Some(degree_bound) = degree_bound {
@@ -283,7 +294,12 @@ impl<E: PairingEngine, S: FiatShamirRng<E::Fr, E::Fq>> SonicKZG10<E, S> {
                                     ck.powers()
                                 };
 
-                                kzg10::KZG10::commit(&powers, &polynomial, hiding_bound, terminator, rng_ref)
+                                let start = Instant::now();
+                                println!("commit start at {:?}", start);
+                                let result = kzg10::KZG10::commit(&powers, &polynomial, hiding_bound, terminator, rng_ref);
+                                println!("commit taken {:?} {:?}", start.elapsed(), start);
+
+                                result
                             }
                         }
                     })
@@ -295,6 +311,8 @@ impl<E: PairingEngine, S: FiatShamirRng<E::Fr, E::Fq>> SonicKZG10<E, S> {
                         a
                     });
                 let comm = kzg10::Commitment(comm.to_affine());
+
+                println!("Polynomial taken: {:?}", start.elapsed());
 
                 Ok((LabeledCommitment::new(label.to_string(), comm, degree_bound), rand))
             });

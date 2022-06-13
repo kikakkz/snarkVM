@@ -24,6 +24,7 @@ use snarkvm_utilities::BitIteratorBE;
 use rust_gpu_tools::{cuda, program_closures, Device, GPUError, Program};
 
 use std::{any::TypeId, path::Path, process::Command};
+use std::time::Instant;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -132,6 +133,7 @@ fn generate_cuda_binary<P: AsRef<Path>>(file_path: P, debug: bool) -> Result<(),
         command.arg("--generate-code=arch=compute_86,code=sm_86");
     }
 
+    command.arg("-Xptxas").arg("-O3").arg("--maxrregcount=64").arg("--use_fast_math");
     command.arg("-fatbin").arg("-dlink").arg("-o").arg(file_path.as_ref().as_os_str());
 
     eprintln!("\nRunning command: {:?}", command);
@@ -230,6 +232,7 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
         // let global_work_size =
         //     (window_lengths.len() * context.num_groups as usize + LOCAL_WORK_SIZE - 1) / LOCAL_WORK_SIZE;
 
+        let start = Instant::now();
         let kernel_1 =
             program.create_kernel(&context.pixel_func_name, window_lengths.len(), context.num_groups as usize)?;
 
@@ -240,10 +243,13 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
             .arg(&window_lengths_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
+        println!("run kernel_1 taken {:?}", start.elapsed());
 
         let kernel_2 = program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;
 
         kernel_2.arg(&result_buffer).arg(&buckets_buffer).arg(&(window_lengths.len() as u32)).run()?;
+
+        println!("run kernel_2 taken {:?}", start.elapsed());
 
         let mut results = vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
         program.read_into_buffer(&result_buffer, &mut results)?;

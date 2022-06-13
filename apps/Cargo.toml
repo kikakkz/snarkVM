@@ -43,6 +43,7 @@ testnet2 = [
   "snarkvm-dpc/default",
   "snarkvm-parameters/default",
   "snarkvm-algorithms/default",
+  "snarkvm-algorithms/cuda",
   "snarkvm-utilities/default",
   "snarkvm-gadgets/default"
 ]

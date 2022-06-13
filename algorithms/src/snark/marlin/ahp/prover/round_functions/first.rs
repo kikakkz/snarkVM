@@ -37,6 +37,7 @@ use snarkvm_fields::PrimeField;
 use snarkvm_utilities::cfg_into_iter;
 
 use rand_core::RngCore;
+use std::time::Instant;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -80,6 +81,8 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
         assert_eq!(private_variables.len(), batch_size);
         let mut r_b_s = Vec::with_capacity(batch_size);
 
+        let start = Instant::now();
+
         let mut job_pool = snarkvm_utilities::ExecutionPool::with_capacity(3 * batch_size);
         let state_ref = &state;
         for (i, (z_a, z_b, private_variables, x_poly)) in
@@ -107,6 +110,8 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
             })
             .collect::<Vec<_>>();
         assert_eq!(batches.len(), batch_size);
+
+        println!("execute job pool taken: {:?}", start.elapsed());
 
         let mask_poly = Self::calculate_mask_poly(constraint_domain, rng);
 
@@ -163,6 +168,8 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
         let ratio = constraint_domain.size() / input_domain.size();
         w_extended.resize(constraint_domain.size() - input_domain.size(), F::zero());
 
+        let start = Instant::now();
+
         let x_evals = {
             let mut coeffs = x_poly.coeffs.clone();
             coeffs.resize(constraint_domain.size(), F::zero());
@@ -184,7 +191,11 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
 
         assert!(w_poly.degree() < constraint_domain.size() - input_domain.size());
         end_timer!(w_poly_time);
-        PoolResult::Witness(LabeledPolynomial::new(label, w_poly, None, Self::zk_bound()))
+        let result = PoolResult::Witness(LabeledPolynomial::new(label, w_poly, None, Self::zk_bound()));
+
+        println!("calculate_w taken {:?}", start.elapsed());
+
+        result
     }
 
     fn calculate_z_m<'a>(
@@ -199,6 +210,8 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
         let should_randomize = MM::ZK && will_be_evaluated;
         let label = label.to_string();
         let poly_time = start_timer!(|| format!("Computing {label}"));
+
+        let start = Instant::now();
 
         let evals = EvaluationsOnDomain::from_vec_and_domain(evaluations, constraint_domain);
 
@@ -236,7 +249,11 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
         };
         end_timer!(poly_time);
 
-        PoolResult::MatrixPoly(poly_for_opening, poly_for_committing)
+        let result = PoolResult::MatrixPoly(poly_for_opening, poly_for_committing);
+
+        println!("calculate_z_m taken {:?}", start.elapsed());
+
+        result
     }
 }
 

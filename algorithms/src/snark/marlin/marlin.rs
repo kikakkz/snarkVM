@@ -54,6 +54,8 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+use std::time::Instant;
+
 /// The Marlin proof system.
 #[derive(Clone, Debug)]
 pub struct MarlinSNARK<
@@ -239,12 +241,17 @@ where
             return Err(SNARKError::EmptyBatch);
         }
 
+        let start = Instant::now();
         Self::terminate(terminator)?;
+
+        println!("Ternimate: {:?}", start.elapsed().as_millis());
 
         let prover_state = AHPForR1CS::<_, MM>::init_prover(&circuit_proving_key.circuit, circuits)?;
         let public_input = prover_state.public_inputs();
         let padded_public_input = prover_state.padded_public_inputs();
         assert_eq!(prover_state.batch_size, batch_size);
+
+        println!("Init Prover: {:?}", start.elapsed().as_millis());
 
         let mut sponge = Self::init_sponge(
             batch_size,
@@ -252,12 +259,16 @@ where
             &padded_public_input,
         );
 
+        println!("Init Sponge: {:?}", start.elapsed().as_millis());
+
         // --------------------------------------------------------------------
         // First round
 
         Self::terminate(terminator)?;
         let mut prover_state = AHPForR1CS::<_, MM>::prover_first_round(prover_state, zk_rng)?;
         Self::terminate(terminator)?;
+
+        println!("First Round 1: {:?}", start.elapsed().as_millis());
 
         let first_round_comm_time = start_timer!(|| "Committing to first round polys");
         let (first_commitments, first_commitment_randomnesses) = {
@@ -270,6 +281,8 @@ where
         };
         end_timer!(first_round_comm_time);
 
+        println!("First Round 2: {:?}", start.elapsed().as_millis());
+
         Self::absorb_labeled(&first_commitments, &mut sponge);
         Self::terminate(terminator)?;
 
@@ -279,6 +292,8 @@ where
             &mut sponge,
         )?;
         // --------------------------------------------------------------------
+
+        println!("First Round: {:?}", start.elapsed().as_millis());
 
         // --------------------------------------------------------------------
         // Second round
@@ -304,6 +319,8 @@ where
             AHPForR1CS::<_, MM>::verifier_second_round(verifier_state, &mut sponge)?;
         // --------------------------------------------------------------------
 
+        println!("Second Round: {:?}", start.elapsed().as_millis());
+
         // --------------------------------------------------------------------
         // Third round
 
@@ -328,6 +345,8 @@ where
             AHPForR1CS::<_, MM>::verifier_third_round(verifier_state, &mut sponge)?;
         // --------------------------------------------------------------------
 
+        println!("Third Round: {:?}", start.elapsed().as_millis());
+
         // --------------------------------------------------------------------
         // Fourth round
 
@@ -350,6 +369,8 @@ where
 
         let verifier_state = AHPForR1CS::<_, MM>::verifier_fourth_round(verifier_state, &mut sponge)?;
         // --------------------------------------------------------------------
+
+        println!("Forth Round: {:?}", start.elapsed().as_millis());
 
         Self::terminate(terminator)?;
 
@@ -462,6 +483,8 @@ where
         let proof = Proof::<E>::new(batch_size, commitments, evaluations, prover_third_message, pc_proof);
         assert_eq!(proof.pc_proof.is_hiding(), MM::ZK);
         end_timer!(prover_time);
+
+        println!("Done: {:?}", start.elapsed().as_millis());
 
         Ok(proof)
     }
